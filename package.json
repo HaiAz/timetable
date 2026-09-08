@@ -19,19 +19,17 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
+    "firebase-tools": "^14.27.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.0.0"
   },
-  "packageManager": "pnpm@11.22.0",
-  "optionalDependencies": {
-    "@firebase/rules-unit-testing": "^5.0.2",
-    "firebase-tools": "^14.27.0"
-  }
+  "packageManager": "pnpm@11.22.0"
 }
