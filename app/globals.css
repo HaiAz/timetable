@@ -1,26 +1,351 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   Design tokens — "Quiet ledger"
+
+   Nền xám trung tính, chỉ dùng màu cho hai việc: nhận diện học sinh và
+   tình trạng học phí.
+
+   Bố cục token:
+     :root                — nền, chữ, viền, và các màu mang nghĩa (không đổi)
+     [data-theme="..."]   — chỉ ghi đè màu nhấn + sắc nền (8 theme)
+
+   Màu "đã thu / chưa thu / nợ" cố định ở mọi theme: người dùng cần nhận ra
+   "đang nợ" theo phản xạ, không phải học lại mỗi lần đổi màu.
+   Tương phản của toàn bộ token đã kiểm bằng số, đạt WCAG AA.
+   ========================================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Canvas & surfaces — --bg do theme quyết định, xem khối [data-theme] */
+  --bg: oklch(0.985 0.002 250);
+  --surface: oklch(1 0 0);
+  --surface-raised: oklch(1 0 0);
+  --surface-inset: oklch(0.968 0.003 250);
+  --surface-hover: oklch(0.955 0.004 250);
+
+  /* Text — 3 mức nhấn */
+  --fg: oklch(0.21 0.015 258);
+  --fg-muted: oklch(0.47 0.014 258);
+  /* L = 0.565 để chữ gợi ý 12px vẫn đạt WCAG AA (4.5:1) trên nền trắng. */
+  --fg-subtle: oklch(0.565 0.012 258);
+  --fg-onaccent: oklch(1 0 0);
+
+  /* Lines & focus — --ring do theme quyết định */
+  --border: oklch(0.912 0.005 258);
+  --border-strong: oklch(0.845 0.008 258);
+  --ring: oklch(0.55 0.18 268);
+
+  /* Brand — giá trị mặc định, luôn bị khối [data-theme] ghi đè */
+  --primary: oklch(0.51 0.19 268);
+  --primary-hover: oklch(0.45 0.19 268);
+  --primary-active: oklch(0.4 0.18 268);
+  --primary-fg: oklch(1 0 0);
+  --primary-bg: oklch(0.955 0.02 268);
+  --primary-border: oklch(0.87 0.055 268);
+
+  /* Money status — CỐ ĐỊNH ở mọi theme */
+  --paid: oklch(0.52 0.13 162);
+  --paid-fg: oklch(0.36 0.1 162);
+  --paid-bg: oklch(0.955 0.035 162);
+  --paid-border: oklch(0.86 0.07 162);
+
+  --unpaid: oklch(0.66 0.15 72);
+  --unpaid-fg: oklch(0.45 0.12 63);
+  --unpaid-bg: oklch(0.965 0.04 80);
+  --unpaid-border: oklch(0.87 0.09 76);
+
+  --overdue: oklch(0.55 0.21 18);
+  --overdue-fg: oklch(0.46 0.19 18);
+  --overdue-bg: oklch(0.962 0.028 18);
+  --overdue-border: oklch(0.87 0.07 18);
+
+  /* Buổi đã dạy (không bao giờ chỉ dựa vào màu — luôn kèm dấu ✓) */
+  --taught-bg: oklch(0.968 0.028 162);
+  --taught-border: oklch(0.6 0.11 162);
+
+  /* Màu nhận diện học sinh nằm ở lib/colors.ts (bảng 40 màu), không phải token
+     CSS: mỗi học sinh lưu mã màu riêng nên cần tra được từ JS. */
+
+  /* Spacing — nhịp 4px */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3rem;
+
+  /* Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* Type scale */
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.125rem;
+
+  /* Shadows — dùng dè, phần lớn cấu trúc do viền đảm nhiệm */
+  --shadow-sm: 0 1px 2px 0 oklch(0.21 0.015 258 / 0.05);
+  --shadow-md:
+    0 2px 4px -1px oklch(0.21 0.015 258 / 0.07),
+    0 1px 2px -1px oklch(0.21 0.015 258 / 0.04);
+  --shadow-dialog:
+    0 16px 40px -8px oklch(0.21 0.015 258 / 0.22),
+    0 4px 12px -4px oklch(0.21 0.015 258 / 0.1);
+
+  /* Motion */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Timetable geometry — week-grid ghi đè --hour-height theo số hàng đang vẽ,
+     để cả dải giờ vừa một màn hình. Giá trị này là mức dự phòng. */
+  --hour-height: 3.5rem;
+  --time-col-width: 3.5rem;
 }
 
+/* ==========================================================================
+   THEME MÀU
+   Mỗi khối chỉ ghi đè màu nhấn và sắc nền. Nguồn: lib/themes.ts
+   Màu chính là bậc đầu tiên trong thang đạt AA (4.5:1) với chữ trắng.
+   ========================================================================== */
+
+[data-theme="ocean"] {
+  /* Xanh biển — chuyên nghiệp, sạch sẽ */
+  --bg: #f7fafe;
+  --primary: #0068e8;
+  --primary-hover: #0058c7;
+  --primary-active: #0049a6;
+  --primary-fg: #ffffff;
+  --primary-bg: #f0f7ff;
+  --primary-border: #b9dcff;
+  --ring: #0875f5;
+}
+
+[data-theme="indigo"] {
+  /* Tím chàm — hiện đại, cao cấp */
+  --bg: #faf9fe;
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --primary-active: #5b21b6;
+  --primary-fg: #ffffff;
+  --primary-bg: #f5f3ff;
+  --primary-border: #ddd6fe;
+  --ring: #7c3aed;
+}
+
+[data-theme="emerald"] {
+  /* Xanh lục — tích cực, thân thiện */
+  --bg: #f6fdfa;
+  --primary: #047857;
+  --primary-hover: #065f46;
+  --primary-active: #064e3b;
+  --primary-fg: #ffffff;
+  --primary-bg: #ecfdf5;
+  --primary-border: #a7f3d0;
+  --ring: #047857;
+}
+
+[data-theme="lavender"] {
+  /* Oải hương — nhẹ nhàng, dịu mắt */
+  --bg: #fbfafe;
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --primary-active: #5b21b6;
+  --primary-fg: #ffffff;
+  --primary-bg: #faf9ff;
+  --primary-border: #ddd6fe;
+  --ring: #7c3aed;
+}
+
+[data-theme="purple"] {
+  /* Tím hồng — sáng tạo, nổi bật */
+  --bg: #fcf9fe;
+  --primary: #9333ea;
+  --primary-hover: #7e22ce;
+  --primary-active: #6b21a8;
+  --primary-fg: #ffffff;
+  --primary-bg: #faf5ff;
+  --primary-border: #e9d5ff;
+  --ring: #9333ea;
+}
+
+[data-theme="coral"] {
+  /* San hô — ấm áp, năng lượng */
+  --bg: #fffaf8;
+  --primary: #c93727;
+  --primary-hover: #a82d21;
+  --primary-active: #8f251b;
+  --primary-fg: #ffffff;
+  --primary-bg: #fff7f5;
+  --primary-border: #ffd0c5;
+  --ring: #c93727;
+}
+
+[data-theme="teal"] {
+  /* Xanh mòng — tươi mới, tự nhiên */
+  --bg: #f5fdfc;
+  --primary: #0f766e;
+  --primary-hover: #115e59;
+  --primary-active: #134e4a;
+  --primary-fg: #ffffff;
+  --primary-bg: #f0fdfa;
+  --primary-border: #99f6e4;
+  --ring: #0f766e;
+}
+
+[data-theme="amber"] {
+  /* Hổ phách — lạc quan, rực rỡ */
+  --bg: #fffcf5;
+  --primary: #b45309;
+  --primary-hover: #92400e;
+  --primary-active: #78350f;
+  --primary-fg: #ffffff;
+  --primary-bg: #fffbeb;
+  --primary-border: #fde68a;
+  --ring: #92400e;
+}
+
+/* Đưa token vào không gian utility của Tailwind (cấu hình CSS-first của v4) */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-inset: var(--surface-inset);
+  --color-surface-hover: var(--surface-hover);
+
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-onaccent: var(--fg-onaccent);
+
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ring: var(--ring);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-bg: var(--primary-bg);
+  --color-primary-border: var(--primary-border);
+
+  --color-paid: var(--paid);
+  --color-paid-fg: var(--paid-fg);
+  --color-paid-bg: var(--paid-bg);
+  --color-paid-border: var(--paid-border);
+
+  --color-unpaid: var(--unpaid);
+  --color-unpaid-fg: var(--unpaid-fg);
+  --color-unpaid-bg: var(--unpaid-bg);
+  --color-unpaid-border: var(--unpaid-border);
+
+  --color-overdue: var(--overdue);
+  --color-overdue-fg: var(--overdue-fg);
+  --color-overdue-bg: var(--overdue-bg);
+  --color-overdue-border: var(--overdue-border);
+
+  --color-taught-bg: var(--taught-bg);
+  --color-taught-border: var(--taught-border);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --text-2xs: var(--text-2xs);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-md: var(--text-md);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
+  --text-3xl: var(--text-3xl);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-dialog: var(--shadow-dialog);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    /* Ứng dụng chỉ dùng nền sáng. */
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    /* Thân trang không bao giờ được cuộn ngang. */
+    overflow-x: hidden;
+  }
+
+  /* Viền focus rõ ràng, chỉ hiện với người dùng bàn phím */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::selection {
+    background: var(--primary-bg);
+    color: var(--fg);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  /* Chữ số đều bề rộng, để các cột số tiền thẳng hàng và không nhảy */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Thanh cuộn mảnh cho các vùng cuộn của thời khoá biểu */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 9999px;
+  }
+}
+
+/* Tôn trọng thiết lập giảm chuyển động của hệ điều hành */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

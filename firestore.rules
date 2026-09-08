@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// Security rules cho Timetable.
+//
+// ⚠️ CẢNH BÁO: ứng dụng hiện KHÔNG có đăng nhập, nên các rule dưới đây cho phép
+// bất kỳ ai đọc và ghi dữ liệu. Cấu hình Firebase (apiKey, projectId) nằm trong
+// bundle JavaScript gửi tới trình duyệt, nên phải coi như công khai — ai xem mã
+// nguồn trang web cũng lấy được và truy cập thẳng vào cơ sở dữ liệu này.
+//
+// Vì vậy KHÔNG lưu ở đây thông tin mà bạn không chấp nhận bị lộ.
+//
+// Cách khoá lại (nên làm khi ứng dụng đã chạy ổn định):
+//   1. Firebase Console → Authentication → bật Google sign-in.
+//   2. Trong lib/store.ts, đổi WORKSPACE_ID thành uid của người đăng nhập.
+//   3. Thay toàn bộ khối `match /workspaces/...` bên dưới bằng:
+//
+//        match /workspaces/{workspaceId}/{document=**} {
+//          allow read, write: if request.auth != null
+//                             && request.auth.uid == workspaceId;
+//        }
+//
+// Sau bước đó chỉ chủ tài khoản mới đọc/ghi được dữ liệu của mình.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Giới hạn quyền truy cập trong đúng ba collection mà ứng dụng dùng, thay
+    // vì mở toàn bộ cơ sở dữ liệu. Không ngăn được người cố tình, nhưng chặn
+    // việc kho dữ liệu bị dùng làm nơi chứa dữ liệu rác tuỳ ý.
+    match /workspaces/{workspaceId}/students/{studentId} {
+      allow read, write: if true;
+    }
+
+    match /workspaces/{workspaceId}/sessions/{sessionId} {
+      allow read, write: if true;
+    }
+
+    match /workspaces/{workspaceId}/bills/{billId} {
+      allow read, write: if true;
+    }
+
+    // Mọi đường dẫn khác đều bị từ chối.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
