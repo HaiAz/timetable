@@ -3,7 +3,15 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-type Tone = "paid" | "unpaid" | "overdue" | "neutral" | "primary" | "taught";
+type Tone =
+  | "paid"
+  | "unpaid"
+  | "overdue"
+  | "neutral"
+  | "primary"
+  | "taught"
+  | "urgent"
+  | "low";
 
 /**
  * Status pills. Every tone pairs a colour with either an icon or distinct
@@ -16,6 +24,10 @@ const TONE: Record<Tone, string> = {
   taught: "bg-taught-bg text-paid-fg border-taught-border",
   primary: "bg-primary-bg text-primary border-primary-border",
   neutral: "bg-surface-inset text-fg-muted border-line",
+  // Nhãn ưu tiên việc cần làm — dùng lại sắc đỏ/vàng của trạng thái học phí
+  // cho nhất quán, nhưng mang nghĩa "gấp / bình thường" chứ không phải tiền.
+  urgent: "bg-overdue-bg text-overdue-fg border-overdue-border",
+  low: "bg-surface-inset text-fg-subtle border-line",
 };
 
 export interface BadgeProps {

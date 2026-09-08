@@ -77,6 +77,17 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: "/cong-viec",
+    label: "Việc cần làm",
+    shortLabel: "Việc",
+    icon: (
+      <svg viewBox="0 0 20 20" className="size-5" fill="none" aria-hidden="true">
+        <rect x="3.25" y="3.25" width="13.5" height="13.5" rx="2" stroke="currentColor" strokeWidth="1.6" />
+        <path d="m6.5 10 2 2 4-4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/cai-dat",
     label: "Cài đặt",
     shortLabel: "Cài đặt",

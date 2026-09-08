@@ -405,7 +405,7 @@ describe("export and import", () => {
     expect((await store.getAll()).students).toEqual([]);
 
     const result = await store.importJSON(json);
-    expect(result).toEqual({ students: 1, sessions: 1, bills: 1 });
+    expect(result).toEqual({ students: 1, sessions: 1, bills: 1, todos: 0 });
 
     const restored = await store.getAll();
     expect(restored.students[0]!.name).toBe("Nguyễn An");
@@ -536,7 +536,7 @@ describe("nâng cấp schema v1 -> v2 (màu học sinh)", () => {
   it("chuyển số sang mã màu chuỗi, giữ đúng sắc", async () => {
     await store.importJSON(v1Doc(1));
     const data = await store.getAll();
-    expect(data.schemaVersion).toBe(2);
+    expect(data.schemaVersion).toBe(SCHEMA_VERSION);
     // 1 = chàm ở v1 -> indigo trong bảng mới
     expect(data.students[0]!.color).toBe("indigo-500");
   });

@@ -24,7 +24,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Giới hạn quyền truy cập trong đúng ba collection mà ứng dụng dùng, thay
+    // Giới hạn quyền truy cập trong đúng bốn collection mà ứng dụng dùng, thay
     // vì mở toàn bộ cơ sở dữ liệu. Không ngăn được người cố tình, nhưng chặn
     // việc kho dữ liệu bị dùng làm nơi chứa dữ liệu rác tuỳ ý.
     match /workspaces/{workspaceId}/students/{studentId} {
@@ -36,6 +36,10 @@ service cloud.firestore {
     }
 
     match /workspaces/{workspaceId}/bills/{billId} {
+      allow read, write: if true;
+    }
+
+    match /workspaces/{workspaceId}/todos/{todoId} {
       allow read, write: if true;
     }
 

@@ -40,11 +40,14 @@ import { getDb, isFirebaseConfigured } from "./firebase";
 import {
   billId,
   SCHEMA_VERSION,
+  TODO_PRIORITIES,
   type AppData,
   type BillStatus,
   type MonthlyBill,
   type Session,
   type Student,
+  type Todo,
+  type TodoPriority,
 } from "./types";
 import { monthOf } from "./date";
 import { isValidColor } from "./colors";
@@ -142,6 +145,10 @@ function billsRef(): CollectionReference<DocumentData> {
   return collection(db(), "workspaces", WORKSPACE_ID, "bills");
 }
 
+function todosRef(): CollectionReference<DocumentData> {
+  return collection(db(), "workspaces", WORKSPACE_ID, "todos");
+}
+
 /* ------------------------------------------------------------------ *
  * Validation
  * ------------------------------------------------------------------ */
@@ -195,6 +202,18 @@ function validBill(value: unknown): value is MonthlyBill {
   );
 }
 
+function validTodo(value: unknown): value is Todo {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.title === "string" &&
+    typeof value.done === "boolean" &&
+    typeof value.createdAt === "string" &&
+    typeof value.priority === "string" &&
+    (TODO_PRIORITIES as readonly string[]).includes(value.priority)
+  );
+}
+
 /**
  * Nâng cấp dữ liệu cũ lên schema hiện tại.
  *
@@ -214,20 +233,31 @@ const V1_COLOR_ORDER = [
 ];
 
 function migrate(value: Record<string, unknown>): Record<string, unknown> {
-  const version = typeof value.schemaVersion === "number" ? value.schemaVersion : 1;
-  if (version >= 2) return value;
-  if (!Array.isArray(value.students)) return value;
+  let version = typeof value.schemaVersion === "number" ? value.schemaVersion : 1;
+  let next = value;
 
-  const students = value.students.map((entry) => {
-    if (!isRecord(entry)) return entry;
-    const { color } = entry;
-    // Chỉ chuyển khi color là số hợp lệ; ngoài ra để trống (= trắng).
-    if (typeof color !== "number") return entry;
-    const mapped = V1_COLOR_ORDER[color - 1];
-    return mapped ? { ...entry, color: mapped } : { ...entry, color: undefined };
-  });
+  if (version < 2) {
+    if (Array.isArray(next.students)) {
+      const students = next.students.map((entry) => {
+        if (!isRecord(entry)) return entry;
+        const { color } = entry;
+        // Chỉ chuyển khi color là số hợp lệ; ngoài ra để trống (= trắng).
+        if (typeof color !== "number") return entry;
+        const mapped = V1_COLOR_ORDER[color - 1];
+        return mapped ? { ...entry, color: mapped } : { ...entry, color: undefined };
+      });
+      next = { ...next, students };
+    }
+    version = 2;
+  }
 
-  return { ...value, schemaVersion: 2, students };
+  if (version < 3) {
+    // v3: thêm danh sách việc cần làm — dữ liệu cũ chưa có thì để rỗng.
+    next = { ...next, todos: Array.isArray(next.todos) ? next.todos : [] };
+    version = 3;
+  }
+
+  return { ...next, schemaVersion: version };
 }
 
 /**
@@ -263,6 +293,9 @@ function validateCurrent(value: unknown, raw?: string): AppData {
   if (!Array.isArray(value.bills)) {
     throw new StoreError("corrupt", "Trường “bills” phải là một danh sách.", raw);
   }
+  if (!Array.isArray(value.todos)) {
+    throw new StoreError("corrupt", "Trường “todos” phải là một danh sách.", raw);
+  }
 
   const badStudent = value.students.findIndex((s) => !validStudent(s));
   if (badStudent !== -1) {
@@ -276,12 +309,17 @@ function validateCurrent(value: unknown, raw?: string): AppData {
   if (badBill !== -1) {
     throw new StoreError("corrupt", `Hoá đơn thứ ${badBill + 1} có dữ liệu không hợp lệ.`, raw);
   }
+  const badTodo = value.todos.findIndex((t) => !validTodo(t));
+  if (badTodo !== -1) {
+    throw new StoreError("corrupt", `Việc cần làm thứ ${badTodo + 1} có dữ liệu không hợp lệ.`, raw);
+  }
 
   return {
     schemaVersion: SCHEMA_VERSION,
     students: value.students as Student[],
     sessions: value.sessions as Session[],
     bills: value.bills as MonthlyBill[],
+    todos: value.todos as Todo[],
   };
 }
 
@@ -325,12 +363,13 @@ function readCollection<T>(
   return out;
 }
 
-/** Đọc toàn bộ ba collection song song. */
+/** Đọc toàn bộ bốn collection song song. */
 async function loadAll(): Promise<AppData> {
-  const [students, sessions, bills] = await Promise.all([
+  const [students, sessions, bills, todos] = await Promise.all([
     getDocs(studentsRef()),
     getDocs(sessionsRef()),
     getDocs(billsRef()),
+    getDocs(todosRef()),
   ]);
 
   return {
@@ -338,6 +377,7 @@ async function loadAll(): Promise<AppData> {
     students: readCollection(students, validStudent, "học sinh"),
     sessions: readCollection(sessions, validSession, "buổi học"),
     bills: readCollection(bills, validBill, "hoá đơn"),
+    todos: readCollection(todos, validTodo, "việc cần làm"),
   };
 }
 
@@ -411,6 +451,12 @@ export interface ImportResult {
   students: number;
   sessions: number;
   bills: number;
+  todos: number;
+}
+
+export interface TodoInput {
+  title: string;
+  priority: TodoPriority;
 }
 
 /** Huỷ đăng ký theo dõi realtime. */
@@ -465,14 +511,16 @@ export const store = {
     let students: Student[] | null = null;
     let sessions: Session[] | null = null;
     let bills: MonthlyBill[] | null = null;
+    let todos: Todo[] | null = null;
 
     function emit() {
-      if (students === null || sessions === null || bills === null) return;
+      if (students === null || sessions === null || bills === null || todos === null) return;
       onData({
         schemaVersion: SCHEMA_VERSION,
         students,
         sessions,
         bills,
+        todos,
       });
     }
 
@@ -505,11 +553,20 @@ export const store = {
         },
         fail,
       );
+      const unsubTodos = onSnapshot(
+        todosRef(),
+        (snapshot) => {
+          todos = readCollection(snapshot, validTodo, "việc cần làm");
+          emit();
+        },
+        fail,
+      );
 
       return () => {
         unsubStudents();
         unsubSessions();
         unsubBills();
+        unsubTodos();
       };
     } catch (error) {
       fail(error);
@@ -878,6 +935,54 @@ export const store = {
     }
   },
 
+  /* ---------------- Todos ---------------- */
+
+  async addTodo(input: TodoInput): Promise<Todo> {
+    const todo: Todo = {
+      id: makeId(),
+      title: input.title.trim(),
+      priority: input.priority,
+      done: false,
+      createdAt: now(),
+    };
+    try {
+      await setDoc(doc(todosRef(), todo.id), stripUndefined({ ...todo }));
+    } catch (error) {
+      throw toStoreError(error, "Không lưu được việc cần làm.");
+    }
+    return todo;
+  },
+
+  async setTodoDone(id: string, done: boolean): Promise<void> {
+    try {
+      const ref = doc(todosRef(), id);
+      const snapshot = await getDoc(ref);
+      if (!snapshot.exists()) {
+        throw new StoreError("corrupt", "Không tìm thấy việc cần làm.");
+      }
+      const current = { ...snapshot.data(), id } as Todo;
+
+      const next: Todo = { ...current, done };
+      if (done) {
+        next.doneAt = now();
+      } else {
+        delete next.doneAt;
+      }
+
+      await setDoc(ref, stripUndefined({ ...next }));
+    } catch (error) {
+      throw toStoreError(error, "Không cập nhật được việc cần làm.");
+    }
+  },
+
+  async deleteTodo(id: string): Promise<void> {
+    try {
+      await deleteDoc(doc(todosRef(), id));
+    } catch (error) {
+      throw toStoreError(error, "Không xoá được việc cần làm.");
+    }
+  },
+
   /* ---------------- Backup ---------------- */
 
   /** Pretty-printed JSON of the whole document, for download. */
@@ -924,6 +1029,10 @@ export const store = {
           ref: doc(billsRef(), b.id),
           value: stripUndefined({ ...b }) as Record<string, unknown>,
         })),
+        ...data.todos.map((t) => ({
+          ref: doc(todosRef(), t.id),
+          value: stripUndefined({ ...t }) as Record<string, unknown>,
+        })),
       ];
 
       // Chỉ xoá bản ghi cũ không bị bản nhập ghi đè — bản bị ghi đè thì lệnh
@@ -933,6 +1042,7 @@ export const store = {
         ...current.students.map((s) => doc(studentsRef(), s.id)),
         ...current.sessions.map((s) => doc(sessionsRef(), s.id)),
         ...current.bills.map((b) => doc(billsRef(), b.id)),
+        ...current.todos.map((t) => doc(todosRef(), t.id)),
       ].filter((ref) => !kept.has(ref.path));
 
       type Op =
@@ -962,6 +1072,7 @@ export const store = {
       students: data.students.length,
       sessions: data.sessions.length,
       bills: data.bills.length,
+      todos: data.todos.length,
     };
   },
 
@@ -972,6 +1083,7 @@ export const store = {
         deleteAll(studentsRef()),
         deleteAll(sessionsRef()),
         deleteAll(billsRef()),
+        deleteAll(todosRef()),
       ]);
     } catch (error) {
       throw toStoreError(error, "Không xoá được dữ liệu.");

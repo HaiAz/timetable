@@ -74,16 +74,32 @@ export interface MonthlyBill {
   paidAmount?: number;
 }
 
+/** Mức độ ưu tiên của một việc cần làm. */
+export const TODO_PRIORITIES = ["urgent", "normal", "low"] as const;
+export type TodoPriority = (typeof TODO_PRIORITIES)[number];
+
+export interface Todo {
+  id: string;
+  title: string;
+  priority: TodoPriority;
+  done: boolean;
+  /** ISO 8601 timestamp. */
+  createdAt: string;
+  /** ISO 8601 timestamp của lần đánh dấu hoàn thành gần nhất. */
+  doneAt?: string;
+}
+
 /** The full persisted document. */
 export interface AppData {
   schemaVersion: number;
   students: Student[];
   sessions: Session[];
   bills: MonthlyBill[];
+  todos: Todo[];
 }
 
-// v2: Student.color chuyển từ số (1–8) sang mã màu chuỗi ("indigo-500").
-export const SCHEMA_VERSION = 2;
+// v3: thêm danh sách việc cần làm (todos).
+export const SCHEMA_VERSION = 3;
 
 export function emptyAppData(): AppData {
   return {
@@ -91,6 +107,7 @@ export function emptyAppData(): AppData {
     students: [],
     sessions: [],
     bills: [],
+    todos: [],
   };
 }
 

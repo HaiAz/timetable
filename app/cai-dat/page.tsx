@@ -127,6 +127,7 @@ export default function SettingsPage() {
         <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 rounded-md border border-line bg-surface-inset px-3 py-2 text-sm">
           <Stat label="Học sinh" value={isLoading ? null : String(data.students.length)} />
           <Stat label="Buổi học" value={isLoading ? null : String(data.sessions.length)} />
+          <Stat label="Việc cần làm" value={isLoading ? null : String(data.todos.length)} />
           <Stat label="Dung lượng" value={size === null ? null : formatBytes(size)} />
         </dl>
 
@@ -324,6 +325,7 @@ function validateShape(parsed: unknown): ImportResult {
     students: value.students.length,
     sessions: value.sessions.length,
     bills: Array.isArray(value.bills) ? value.bills.length : 0,
+    todos: Array.isArray(value.todos) ? value.todos.length : 0,
   };
 }
 
