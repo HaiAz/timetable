@@ -1,5 +1,8 @@
 allowBuilds:
   '@firebase/util': true
   protobufjs: true
+  # re2 đến từ firebase-tools (chỉ dùng khi chạy emulator lúc test). Nó biên
+  # dịch native binding; để false thì bỏ qua bước đó mà pnpm vẫn không exit 1.
+  re2: false
   sharp: false
   unrs-resolver: false
