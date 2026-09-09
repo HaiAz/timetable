@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Field, Select } from "@/components/ui/field";
 import { useData } from "@/components/data-provider";
 import { useToast } from "@/components/ui/toast";
 import { store } from "@/lib/store";
@@ -10,8 +11,11 @@ import { addDays, formatWeekRange, weekDates } from "@/lib/date";
 import { cn } from "@/lib/cn";
 import { WarnIcon } from "@/components/ui/badge";
 
+/** Phạm vi tuần cho phép chọn: khoảng 2 tháng trước và sau tuần đang xem. */
+const WEEK_OPTIONS_RADIUS = 9;
+
 /**
- * Copies the previous week's sessions into the viewed week.
+ * Copies another week's sessions into the viewed week.
  *
  * This is the only repeat mechanism in the app — there are no recurring rules.
  * Every copy is an independent record, so editing one week never touches
@@ -29,28 +33,54 @@ export function ApplyLastWeekDialog({
   const { data, run } = useData();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
+  const [sourceWeekStart, setSourceWeekStart] = useState(() => addDays(weekStart, -7));
 
-  const previousWeekStart = addDays(weekStart, -7);
+  // Mỗi lần mở lại (hoặc đổi tuần đang xem), quay về mặc định "tuần trước" —
+  // dialog không unmount giữa các lần mở nên state cũ vẫn còn nếu không reset.
+  useEffect(() => {
+    if (open) setSourceWeekStart(addDays(weekStart, -7));
+  }, [open, weekStart]);
+
+  const archivedIds = useMemo(
+    () => new Set(data.students.filter((s) => s.archived).map((s) => s.id)),
+    [data.students],
+  );
+
+  /**
+   * Session count cho mỗi tuần ứng viên (không tính học sinh đã lưu trữ),
+   * sắp xếp từ xa nhất trong quá khứ đến xa nhất trong tương lai. Chỉ trong
+   * khoảng ±2 tháng quanh tuần đang xem — xa hơn thì không cần sao chép tới.
+   */
+  const weekOptions = useMemo(() => {
+    const options: { start: string; count: number }[] = [];
+    for (let i = -WEEK_OPTIONS_RADIUS; i <= WEEK_OPTIONS_RADIUS; i++) {
+      if (i === 0) continue;
+      const start = addDays(weekStart, 7 * i);
+      const dates = new Set(weekDates(start));
+      const count = data.sessions.filter(
+        (s) => dates.has(s.date) && !archivedIds.has(s.studentId),
+      ).length;
+      options.push({ start, count });
+    }
+    return options;
+  }, [weekStart, data.sessions, archivedIds]);
 
   const { sourceCount, targetCount, archivedCount } = useMemo(() => {
-    const sourceDates = new Set(weekDates(previousWeekStart));
+    const sourceDates = new Set(weekDates(sourceWeekStart));
     const targetDates = new Set(weekDates(weekStart));
-    const archived = new Set(
-      data.students.filter((s) => s.archived).map((s) => s.id),
-    );
 
     const source = data.sessions.filter((s) => sourceDates.has(s.date));
     return {
-      sourceCount: source.filter((s) => !archived.has(s.studentId)).length,
-      archivedCount: source.filter((s) => archived.has(s.studentId)).length,
+      sourceCount: source.filter((s) => !archivedIds.has(s.studentId)).length,
+      archivedCount: source.filter((s) => archivedIds.has(s.studentId)).length,
       targetCount: data.sessions.filter((s) => targetDates.has(s.date)).length,
     };
-  }, [data.sessions, data.students, previousWeekStart, weekStart]);
+  }, [data.sessions, archivedIds, sourceWeekStart, weekStart]);
 
   async function apply(mode: "append" | "replace") {
     setBusy(true);
     const result = await run(() =>
-      store.applyPreviousWeek(weekStart, previousWeekStart, mode),
+      store.applyPreviousWeek(weekStart, sourceWeekStart, mode),
     );
     setBusy(false);
     onClose();
@@ -75,14 +105,22 @@ export function ApplyLastWeekDialog({
     }
   }
 
-  /* Nothing to copy ---------------------------------------------------- */
+  const picker = (
+    <WeekPicker
+      value={sourceWeekStart}
+      options={weekOptions}
+      onChange={setSourceWeekStart}
+    />
+  );
+
+  /* Nothing to copy from the selected week ----------------------------- */
   if (sourceCount === 0) {
     return (
       <Dialog
         open={open}
         onClose={onClose}
-        title="Tuần trước không có buổi học"
-        description={`${formatWeekRange(previousWeekStart)} chưa có buổi học nào để sao chép.`}
+        title="Tuần đó không có buổi học"
+        description={`${formatWeekRange(sourceWeekStart)} chưa có buổi học nào để sao chép.`}
         size="sm"
         footer={
           <Button intent="primary" onClick={onClose} data-autofocus>
@@ -90,11 +128,14 @@ export function ApplyLastWeekDialog({
           </Button>
         }
       >
-        <p className="text-base text-fg-muted">
-          {archivedCount > 0
-            ? `Tuần trước có ${archivedCount} buổi của học sinh đã lưu trữ, những buổi này không được sao chép.`
-            : "Hãy thêm buổi học thủ công cho tuần này."}
-        </p>
+        <div className="flex flex-col gap-3">
+          {picker}
+          <p className="text-base text-fg-muted">
+            {archivedCount > 0
+              ? "Tuần đó chỉ có buổi của học sinh đã lưu trữ, những buổi này không được sao chép."
+              : "Hãy chọn một tuần khác, hoặc thêm buổi học thủ công cho tuần này."}
+          </p>
+        </div>
       </Dialog>
     );
   }
@@ -105,8 +146,8 @@ export function ApplyLastWeekDialog({
       <Dialog
         open={open}
         onClose={onClose}
-        title="Áp dụng lịch tuần trước"
-        description={`Sao chép ${sourceCount} buổi học từ ${formatWeekRange(previousWeekStart)} sang ${formatWeekRange(weekStart)}.`}
+        title="Áp dụng lịch tuần khác"
+        description={`Sao chép buổi học sang ${formatWeekRange(weekStart)}.`}
         size="sm"
         footer={
           <>
@@ -124,7 +165,10 @@ export function ApplyLastWeekDialog({
           </>
         }
       >
-        <Notes archivedCount={archivedCount} />
+        <div className="flex flex-col gap-3">
+          {picker}
+          <Notes archivedCount={archivedCount} />
+        </div>
       </Dialog>
     );
   }
@@ -143,9 +187,10 @@ export function ApplyLastWeekDialog({
       }
     >
       <div className="flex flex-col gap-2.5">
+        {picker}
         <ChoiceCard
           title="Thêm vào lịch hiện có"
-          description={`Giữ ${targetCount} buổi đang có và thêm các buổi của tuần trước. Buổi trùng hoàn toàn (cùng học sinh, cùng thứ, cùng giờ) sẽ được bỏ qua.`}
+          description={`Giữ ${targetCount} buổi đang có và thêm các buổi của tuần đã chọn. Buổi trùng hoàn toàn (cùng học sinh, cùng thứ, cùng giờ) sẽ được bỏ qua.`}
           actionLabel="Thêm vào"
           onClick={() => void apply("append")}
           busy={busy}
@@ -153,7 +198,7 @@ export function ApplyLastWeekDialog({
         />
         <ChoiceCard
           title="Xoá và thay thế"
-          description={`Xoá toàn bộ ${targetCount} buổi của tuần này, kể cả buổi đã đánh dấu đã dạy, rồi sao chép ${sourceCount} buổi từ tuần trước.`}
+          description={`Xoá toàn bộ ${targetCount} buổi của tuần này, kể cả buổi đã đánh dấu đã dạy, rồi sao chép ${sourceCount} buổi từ tuần đã chọn.`}
           actionLabel="Xoá và thay thế"
           onClick={() => void apply("replace")}
           busy={busy}
@@ -162,6 +207,30 @@ export function ApplyLastWeekDialog({
         <Notes archivedCount={archivedCount} />
       </div>
     </Dialog>
+  );
+}
+
+/** Picks which week to copy from; weeks with no sessions are disabled. */
+function WeekPicker({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: { start: string; count: number }[];
+  onChange: (start: string) => void;
+}) {
+  return (
+    <Field label="Sao chép lịch của tuần">
+      <Select value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map(({ start, count }) => (
+          <option key={start} value={start} disabled={count === 0}>
+            {formatWeekRange(start)}
+            {count === 0 ? " — không có buổi học" : ` — ${count} buổi học`}
+          </option>
+        ))}
+      </Select>
+    </Field>
   );
 }
 

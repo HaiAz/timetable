@@ -7,8 +7,10 @@ import type { Session, Student } from "@/lib/types";
 import { SessionBlock } from "./session-block";
 import {
   buildHourRows,
+  DEFAULT_END_HOUR,
   DEFAULT_START_HOUR,
   earliestHour,
+  latestHour,
   occupiedHours,
   placeSessions,
 } from "./overlap";
@@ -56,14 +58,16 @@ export function WeekGrid({
   const occupied = useMemo(() => occupiedHours(sessions), [sessions]);
   const rows = useMemo(() => buildHourRows(occupied, { expanded }), [occupied, expanded]);
 
-  // Tuần này có buổi trước khung mặc định không — để giải thích vì sao lưới
+  // Tuần này có buổi ngoài khung mặc định không — để giải thích vì sao lưới
   // đang cao hơn bình thường.
   const firstHour = useMemo(() => earliestHour(sessions), [sessions]);
+  const lastHour = useMemo(() => latestHour(sessions), [sessions]);
   const hasEarlySession = firstHour !== null && firstHour < DEFAULT_START_HOUR;
+  const hasLateSession = lastHour !== null && lastHour >= DEFAULT_END_HOUR;
 
   // Chiều cao mỗi hàng co lại để cả dải giờ vừa một màn hình, không phải cuộn.
   // Càng nhiều hàng thì hàng càng thấp, nhưng không dưới 2rem để còn đọc được.
-  const rowHeight = `max(2rem, (100dvh - 19rem) / ${rows.length})`;
+  const rowHeight = `max(2rem, (100dvh - 17rem) / ${rows.length})`;
 
   return (
     <div className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface">
@@ -80,7 +84,7 @@ export function WeekGrid({
             <div
               key={date}
               className={cn(
-                "min-w-0 flex-1 border-r border-line px-1 py-2 text-center last:border-r-0",
+                "flex min-w-0 flex-1 items-baseline justify-center gap-1 border-r border-line px-1 py-1 text-center last:border-r-0",
                 isToday && "bg-primary-bg",
               )}
             >
@@ -94,7 +98,7 @@ export function WeekGrid({
               </p>
               <p
                 className={cn(
-                  "font-mono tnum text-sm font-semibold",
+                  "font-mono tnum text-xs font-semibold",
                   isToday ? "text-primary" : "text-fg",
                 )}
               >
@@ -150,12 +154,20 @@ export function WeekGrid({
         <span className="text-2xs text-fg-subtle">
           {expanded
             ? "Đang hiện đủ 24 giờ"
-            : hasEarlySession
-              ? `Đã nới xuống ${String(firstHour).padStart(2, "0")}:00 vì có buổi học sớm`
-              : `Khung giờ ${String(DEFAULT_START_HOUR).padStart(2, "0")}:00 – 24:00`}
+            : hasEarlySession && hasLateSession
+              ? `Đã nới khung ${String(firstHour).padStart(2, "0")}:00 – ${String(
+                  (lastHour ?? DEFAULT_END_HOUR) + 1,
+                ).padStart(2, "0")}:00 vì có buổi học ngoài giờ`
+              : hasEarlySession
+                ? `Đã nới xuống ${String(firstHour).padStart(2, "0")}:00 vì có buổi học sớm`
+                : hasLateSession
+                  ? `Đã nới lên ${String((lastHour ?? DEFAULT_END_HOUR) + 1).padStart(2, "0")}:00 vì có buổi học muộn`
+                  : `Khung giờ ${String(DEFAULT_START_HOUR).padStart(2, "0")}:00 – ${String(DEFAULT_END_HOUR).padStart(2, "0")}:00`}
         </span>
         <Button intent="quiet" size="sm" onClick={() => setExpanded((v) => !v)}>
-          {expanded ? `Về khung ${DEFAULT_START_HOUR}:00 – 24:00` : "Hiện đủ 24 giờ"}
+          {expanded
+            ? `Về khung ${DEFAULT_START_HOUR}:00 – ${DEFAULT_END_HOUR}:00`
+            : "Hiện đủ 24 giờ"}
         </Button>
       </div>
     </div>

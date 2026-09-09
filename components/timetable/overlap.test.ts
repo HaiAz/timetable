@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildHourRows,
+  DEFAULT_END_HOUR,
   DEFAULT_START_HOUR,
   findOverlaps,
   occupiedHours,
@@ -151,17 +152,17 @@ describe("occupiedHours", () => {
 describe("buildHourRows", () => {
   const hoursOf = (rows: ReturnType<typeof buildHourRows>) => rows.map((r) => r.hour);
 
-  it("mặc định là khung 06:00–24:00, đúng 18 hàng", () => {
+  it("mặc định là khung 07:00–23:00, đúng 16 hàng", () => {
     const rows = buildHourRows(new Set([9, 10, 19]));
-    expect(rows).toHaveLength(18);
+    expect(rows).toHaveLength(16);
     expect(hoursOf(rows)).toEqual([
-      6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+      7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
     ]);
   });
 
   it("dùng đúng khung mặc định khi chưa có buổi nào", () => {
     const rows = buildHourRows(new Set());
-    expect(rows).toHaveLength(18);
+    expect(rows).toHaveLength(16);
     expect(hoursOf(rows)[0]).toBe(DEFAULT_START_HOUR);
   });
 
@@ -173,12 +174,12 @@ describe("buildHourRows", () => {
     }
   });
 
-  it("tự nới xuống khi có buổi trước 6h, không ẩn mất buổi", () => {
+  it("tự nới xuống khi có buổi trước 7h, không ẩn mất buổi", () => {
     const rows = buildHourRows(new Set([3, 9]));
     const hours = hoursOf(rows);
     expect(hours[0]).toBe(3);
     expect(hours).toContain(3);
-    expect(rows).toHaveLength(21);
+    expect(rows).toHaveLength(20);
   });
 
   it("nới tới đúng buổi sớm nhất", () => {
@@ -197,15 +198,22 @@ describe("buildHourRows", () => {
     expect(hoursOf(rows)[23]).toBe(23);
   });
 
-  it("luôn kết thúc ở 23 giờ (tức tới 24:00)", () => {
-    for (const occupied of [new Set<number>(), new Set([3]), new Set([9, 22])]) {
+  it("mặc định kết thúc ở 23 giờ trừ khi có buổi muộn hơn", () => {
+    for (const occupied of [new Set<number>(), new Set([3]), new Set([9, 20])]) {
       const hours = hoursOf(buildHourRows(occupied));
-      expect(hours[hours.length - 1]).toBe(23);
+      expect(hours[hours.length - 1]).toBe(DEFAULT_END_HOUR - 1);
     }
   });
 
+  it("tự nới lên khi có buổi từ 23h trở đi, không ẩn mất buổi", () => {
+    const rows = buildHourRows(new Set([9, 23]));
+    const hours = hoursOf(rows);
+    expect(hours.at(-1)).toBe(23);
+    expect(hours).toContain(23);
+  });
+
   it("mọi giờ có buổi học đều được vẽ", () => {
-    const occupied = new Set([6, 12, 23]);
+    const occupied = new Set([7, 12, 22]);
     const hours = hoursOf(buildHourRows(occupied));
     for (const hour of occupied) {
       expect(hours).toContain(hour);

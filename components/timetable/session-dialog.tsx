@@ -479,12 +479,6 @@ function AmountPreview({
           {invalid || !student ? "—" : formatVND(amount)}
         </span>
       </div>
-
-      {!taught && student && !invalid && (
-        <p className="mt-1.5 border-t border-line pt-1.5 text-2xs text-fg-subtle">
-          Chỉ được tính vào học phí sau khi đánh dấu “đã dạy”.
-        </p>
-      )}
     </div>
   );
 }

@@ -170,8 +170,8 @@ export default function TimetablePage() {
 
             <Button intent="secondary" onClick={() => setApplyOpen(true)}>
               <CopyIcon />
-              <span className="hidden sm:inline">Áp dụng lịch tuần trước</span>
-              <span className="sm:hidden">Lịch tuần trước</span>
+              <span className="hidden sm:inline">Áp dụng lịch tuần khác</span>
+              <span className="sm:hidden">Lịch tuần khác</span>
             </Button>
 
             <Button
@@ -226,7 +226,7 @@ export default function TimetablePage() {
           description={
             <>
               Tuần {formatWeekRange(weekStart)} đang trống. Bạn có thể thêm buổi học
-              thủ công, hoặc sao chép lại lịch của tuần trước.
+              thủ công, hoặc sao chép lại lịch của một tuần khác.
             </>
           }
           actions={
@@ -237,7 +237,7 @@ export default function TimetablePage() {
               </Button>
               <Button intent="secondary" onClick={() => setApplyOpen(true)}>
                 <CopyIcon />
-                Áp dụng lịch tuần trước
+                Áp dụng lịch tuần khác
               </Button>
             </>
           }

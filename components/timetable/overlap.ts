@@ -131,19 +131,23 @@ export function buildHourRows(
 ): GridRow[] {
   const { expanded = false } = options;
 
-  // Khung dạy mặc định: 06:00–23:59. 18 hàng vừa đúng một màn hình, nên không
-  // cần thu gọn khoảng trống ở giữa — nhìn được bao quát cả tuần.
+  // Khung dạy mặc định: 07:00–22:59. Vừa đúng một màn hình, nên không cần
+  // thu gọn khoảng trống ở giữa — nhìn được bao quát cả tuần.
   const start = expanded ? 0 : Math.min(DEFAULT_START_HOUR, earliestOccupied(occupied));
+  const end = expanded ? 24 : Math.max(DEFAULT_END_HOUR, latestOccupied(occupied));
 
   const rows: GridRow[] = [];
-  for (let hour = start; hour < 24; hour++) {
+  for (let hour = start; hour < end; hour++) {
     rows.push({ kind: "hour", hour });
   }
   return rows;
 }
 
 /** Giờ bắt đầu mặc định của lưới. */
-export const DEFAULT_START_HOUR = 6;
+export const DEFAULT_START_HOUR = 7;
+
+/** Giờ kết thúc mặc định của lưới (không bao gồm). */
+export const DEFAULT_END_HOUR = 23;
 
 /**
  * Giờ sớm nhất có buổi học, để lưới tự nới xuống khi cần — buổi học trước 6h
@@ -157,6 +161,18 @@ function earliestOccupied(occupied: Set<number>): number {
   return earliest;
 }
 
+/**
+ * Giờ muộn nhất có buổi học (dạng "chặn trên", cộng thêm 1 so với giờ thật)
+ * — để lưới tự nới lên khi cần, buổi học sau 23h không bao giờ bị ẩn mất.
+ */
+function latestOccupied(occupied: Set<number>): number {
+  let latest = 0;
+  for (const hour of occupied) {
+    if (hour + 1 > latest) latest = hour + 1;
+  }
+  return latest;
+}
+
 /** The earliest occupied hour, for auto-scroll. */
 export function earliestHour(sessions: Session[]): number | null {
   let earliest: number | null = null;
@@ -165,4 +181,14 @@ export function earliestHour(sessions: Session[]): number | null {
     if (earliest === null || hour < earliest) earliest = hour;
   }
   return earliest;
+}
+
+/** The latest occupied hour (a session starting at 23:30 counts as 23). */
+export function latestHour(sessions: Session[]): number | null {
+  let latest: number | null = null;
+  for (const session of sessions) {
+    const hour = Math.floor(toMinutes(session.startTime) / 60);
+    if (latest === null || hour > latest) latest = hour;
+  }
+  return latest;
 }
