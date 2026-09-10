@@ -60,8 +60,11 @@ export const config = {
    *  - _next/static,
    *    _next/image       tài nguyên build; chặn ở đây sẽ làm vỡ giao diện
    *  - favicon, ảnh…     tệp trong thư mục public
+   *  - sw.js, manifest   trình duyệt tải hai tệp này *trước* khi người dùng
+   *                      đăng nhập; redirect chúng sang /verify thì không cài
+   *                      được app lên máy
    */
   matcher: [
-    "/((?!api/verify|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!api/verify|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
