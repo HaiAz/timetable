@@ -17,13 +17,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lịch dạy — Quản lý lịch dạy & học phí",
+  title: "Nugaenny — Quản lý lịch dạy & học phí",
   description:
     "Quản lý thời khoá biểu dạy kèm 1-1 và tính học phí. Dữ liệu đồng bộ qua Firebase.",
   // iOS bỏ qua manifest khi thêm vào màn hình chính, phải khai báo riêng.
   appleWebApp: {
     capable: true,
-    title: "Lịch dạy",
+    title: "Nugaenny",
     statusBarStyle: "default",
   },
 };

@@ -116,7 +116,7 @@ function VerifyShell({ children }: { children?: React.ReactNode }) {
           <span className="flex size-11 items-center justify-center rounded-xl bg-primary text-white">
             <LockIcon />
           </span>
-          <h1 className="text-lg font-semibold text-fg">Lịch dạy</h1>
+          <h1 className="text-lg font-semibold text-fg">Nugaenny</h1>
           <p className="text-sm text-fg-muted">Nhập mật mã để vào ứng dụng.</p>
         </div>
 

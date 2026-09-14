@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Lịch dạy — Quản lý lịch dạy & học phí",
-    short_name: "Lịch dạy",
+    name: "Nugaenny — Quản lý lịch dạy & học phí",
+    short_name: "Nugaenny",
     description:
       "Quản lý thời khoá biểu dạy kèm 1-1 và tính học phí. Dữ liệu đồng bộ qua Firebase.",
     start_url: "/",

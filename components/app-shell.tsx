@@ -137,7 +137,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <BrandMark />
           <div className="min-w-0">
             <p className="truncate text-base font-semibold tracking-tight text-fg">
-              Lịch dạy
+              Nugaenny
             </p>
             <p className="truncate text-2xs text-fg-subtle">Quản lý &amp; học phí</p>
           </div>
@@ -161,7 +161,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* ---------------- Mobile header ---------------- */}
       <header className="flex shrink-0 items-center gap-2 border-b border-line bg-surface px-4 py-2.5 lg:hidden">
         <BrandMark />
-        <span className="text-base font-semibold tracking-tight text-fg">Lịch dạy</span>
+        <span className="text-base font-semibold tracking-tight text-fg">Nugaenny</span>
       </header>
 
       {/* ---------------- Main ---------------- */}
