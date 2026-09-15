@@ -243,7 +243,9 @@ function HourCell({
         "relative min-w-0 flex-1 border-r border-b border-line last:border-r-0",
         // Blocks longer than an hour spill into the rows below.
         "overflow-visible",
-        isToday && "bg-primary-bg/25",
+        // Nền lưới lõm nhẹ để khối buổi học (nền sáng hơn, có viền) nổi lên
+        // như vật thể riêng — khoảng nghỉ vì thế đọc được dù chỉ vài pixel.
+        isToday ? "bg-primary-bg/25" : "bg-surface-inset/40",
       )}
       style={{ height: "var(--hour-height)" }}
     >

@@ -60,8 +60,11 @@ export function SessionBlock({
     <div
       className="group/block absolute z-10 hover:z-20 focus-within:z-20"
       style={{
-        top: `calc(${top / 100} * var(--hour-height))`,
-        height: `calc(${height / 100} * var(--hour-height) - 2px)`,
+        top: `calc(${top / 100} * var(--hour-height) + 1px)`,
+        // Trừ 3px thay vì 2px: hai buổi liền kề cách nhau một rãnh thấy được
+        // chứ không dính thành một khối. Lưới bị nén (~39px/giờ) nên rãnh này
+        // là thứ duy nhất phân định hai buổi sát giờ nhau.
+        height: `calc(${height / 100} * var(--hour-height) - 3px)`,
         left: `calc(${left}% + 1px)`,
         width: `calc(${width}% - 2px)`,
         ...(hex ? { ["--sc" as string]: hex } : {}),
@@ -71,17 +74,20 @@ export function SessionBlock({
         type="button"
         onClick={() => onSelect(session)}
         className={cn(
-          "flex size-full flex-col overflow-hidden rounded-md border-l-[3px] text-left",
+          // Viền đủ bốn cạnh — không chỉ vạch trái. Khi hai buổi sát nhau,
+          // cạnh trên/dưới là thứ cho thấy đây là hai khối riêng biệt.
+          "flex size-full flex-col overflow-hidden rounded-md border border-l-[3px] text-left",
           "px-1.5 py-1 transition-[filter,box-shadow] duration-(--dur-fast)",
           "group-hover/block:shadow-md group-hover/block:brightness-[0.98]",
           session.taught
             ? // Đã dạy: nền xanh nhạt + viền đậm + dấu ✓ bên dưới.
-              "border-l-taught-border bg-taught-bg text-paid-fg"
+              "border-taught-border/40 border-l-taught-border bg-taught-bg text-paid-fg"
             : hex
-              ? // Đã xếp lịch, có màu: sắc của học sinh pha rất nhạt làm nền.
-                "border-l-(--sc) bg-[color-mix(in_oklch,var(--sc)_12%,var(--surface))] text-fg"
+              ? // Đã xếp lịch, có màu: sắc của học sinh pha rất nhạt làm nền,
+                // viền cùng sắc nhưng đậm hơn để tách khỏi nền lưới.
+                "border-[color-mix(in_oklch,var(--sc)_38%,var(--surface))] border-l-(--sc) bg-[color-mix(in_oklch,var(--sc)_12%,var(--surface))] text-fg"
               : // Không chọn màu: nền trắng, viền xám.
-                "border-l-line-strong bg-surface text-fg",
+                "border-line border-l-line-strong bg-surface text-fg",
           !student && "opacity-60",
         )}
         aria-label={`${name}, ${timeRange}, ${formatDurationShort(minutes)}${
