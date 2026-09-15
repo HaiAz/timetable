@@ -20,13 +20,10 @@ export function SessionBlock({
   placed,
   student,
   onSelect,
-  compact = false,
 }: {
   placed: PlacedSession;
   student: Student | undefined;
   onSelect: (session: Session) => void;
-  /** Mobile single-day view has more width; the grid needs terser text. */
-  compact?: boolean;
 }) {
   const { session, startMinutes, endMinutes, column, columnCount } = placed;
   const minutes = sessionMinutes(session);
@@ -112,8 +109,7 @@ export function SessionBlock({
             {name}
           </span>
           <span className="shrink-0 truncate font-mono tnum text-[0.625rem] leading-tight opacity-80">
-            {compact ? timeRange : session.startTime}
-            {!compact && <span className="ml-1">{formatDurationShort(minutes)}</span>}
+            {timeRange}
           </span>
         </span>
       </button>
