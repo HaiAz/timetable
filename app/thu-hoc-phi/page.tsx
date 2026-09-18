@@ -15,6 +15,8 @@ import {
 import { CalendarIcon, EmptyState, WalletIcon } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { store } from "@/lib/store";
+import { copyText } from "@/lib/clipboard";
+import { buildPaymentMessage } from "@/lib/payment-message";
 import { monthSummary, monthTotals, type StudentMonthTotal } from "@/lib/billing";
 import { addMonths, formatDate, formatMonth, monthOf } from "@/lib/date";
 import { useToday } from "@/lib/use-client-date";
@@ -212,6 +214,7 @@ export default function CollectPaymentPage() {
                   key={total.studentId}
                   total={total}
                   student={student}
+                  month={month}
                   expanded={expanded.has(total.studentId)}
                   onToggle={() => toggleRow(total.studentId)}
                   onMarkPaid={() => void markPaid(total, student)}
@@ -231,6 +234,7 @@ export default function CollectPaymentPage() {
 function PaymentRow({
   total,
   student,
+  month,
   expanded,
   onToggle,
   onMarkPaid,
@@ -238,14 +242,34 @@ function PaymentRow({
 }: {
   total: StudentMonthTotal;
   student: Student;
+  /** YYYY-MM */
+  month: string;
   expanded: boolean;
   onToggle: () => void;
   onMarkPaid: () => void;
   onMarkUnpaid: () => void;
 }) {
+  const { toast } = useToast();
   const paid = total.status === "paid";
   const short = total.shortfall > 0;
   const panelId = `sessions-${total.studentId}`;
+
+  const message = buildPaymentMessage({
+    month,
+    studentName: student.name,
+    sessionCount: total.sessionCount,
+    amount: total.totalAmount,
+  });
+
+  async function copyMessage() {
+    const ok = await copyText(message);
+    toast({
+      message: ok
+        ? `Đã copy tin nhắn học phí của ${student.name}.`
+        : "Không copy được. Hãy thử lại hoặc copy thủ công.",
+      tone: ok ? "success" : "error",
+    });
+  }
 
   return (
     <li className={cn(paid && !short && "bg-paid-bg/40")}>
@@ -315,8 +339,19 @@ function PaymentRow({
           )}
         </div>
 
-        {/* Status + action */}
-        <div className="flex w-full shrink-0 items-center justify-end gap-2 md:w-32">
+        {/* Status + actions */}
+        <div className="flex w-full shrink-0 items-center justify-end gap-1.5 md:w-56">
+          <Button
+            intent="secondary"
+            size="sm"
+            onClick={() => void copyMessage()}
+            title="Copy tin nhắn nhắc học phí để gửi phụ huynh"
+            className="whitespace-nowrap"
+          >
+            <MessageIcon />
+            Tin nhắn
+          </Button>
+
           {paid ? (
             short ? (
               <div className="flex flex-col items-end gap-1">
@@ -338,7 +373,12 @@ function PaymentRow({
               </div>
             )
           ) : (
-            <Button intent="primary" size="sm" onClick={onMarkPaid}>
+            <Button
+              intent="primary"
+              size="sm"
+              onClick={onMarkPaid}
+              className="whitespace-nowrap"
+            >
               Đánh dấu đã thu
             </Button>
           )}
@@ -401,6 +441,19 @@ function PaymentRow({
         </div>
       )}
     </li>
+  );
+}
+
+function MessageIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="size-3.5 shrink-0" fill="none" aria-hidden="true">
+      <path
+        d="M2.5 4.25A1.75 1.75 0 0 1 4.25 2.5h7.5a1.75 1.75 0 0 1 1.75 1.75v5A1.75 1.75 0 0 1 11.75 11H6.5L3.5 13.5V11h-.75A.25.25 0 0 1 2.5 10.75z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
