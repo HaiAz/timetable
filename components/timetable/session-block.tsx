@@ -45,6 +45,18 @@ export function SessionBlock({
     });
   }
 
+  async function remove(event: React.MouseEvent) {
+    event.stopPropagation();
+    // Không hỏi lại: xoá nhanh là mục đích của nút này, và toast hoàn tác
+    // khôi phục nguyên vẹn buổi học nên bấm nhầm không mất dữ liệu.
+    await run(() => store.deleteSession(session.id));
+    toast({
+      message: `Đã xoá buổi của ${name}.`,
+      tone: "success",
+      onUndo: () => void run(() => store.restoreSession(session)),
+    });
+  }
+
   // Position within the day column, in hour-height units.
   const top = (startMinutes / 60) * 100;
   const height = ((endMinutes - startMinutes) / 60) * 100;
@@ -120,42 +132,71 @@ export function SessionBlock({
         </span>
       </button>
 
-      {student && (
+      {/* Thao tác nhanh — hiện khi rê chuột, để khỏi phải mở hộp thoại */}
+      <div
+        className={cn(
+          "absolute right-0.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5",
+          "opacity-0 transition-opacity duration-(--dur-fast)",
+          "group-hover/block:opacity-100 group-focus-within/block:opacity-100",
+        )}
+      >
+        {student && (
+          <button
+            type="button"
+            onClick={(event) => void toggleTaught(event)}
+            title={session.taught ? "Bỏ đánh dấu đã dạy" : "Đánh dấu đã dạy"}
+            aria-label={session.taught ? "Bỏ đánh dấu đã dạy" : "Đánh dấu đã dạy"}
+            className={cn(
+              "flex size-4 items-center justify-center rounded-full border shadow-sm",
+              "transition-transform duration-(--dur-fast) hover:scale-110",
+              session.taught
+                ? "border-taught-border bg-surface text-fg-subtle"
+                : "border-primary bg-primary text-primary-fg",
+            )}
+          >
+            <svg viewBox="0 0 16 16" className="size-2.5" fill="none" aria-hidden="true">
+              {session.taught ? (
+                <path
+                  d="M4.5 4.5l7 7m0-7-7 7"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                />
+              ) : (
+                <path
+                  d="m3.5 8.5 3 3 6-7"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+            </svg>
+          </button>
+        )}
+
         <button
           type="button"
-          onClick={(event) => void toggleTaught(event)}
-          title={session.taught ? "Bỏ đánh dấu đã dạy" : "Đánh dấu đã dạy"}
-          aria-label={session.taught ? "Bỏ đánh dấu đã dạy" : "Đánh dấu đã dạy"}
+          onClick={(event) => void remove(event)}
+          title="Xoá buổi học"
+          aria-label={`Xoá buổi học của ${name}`}
           className={cn(
-            "absolute right-0.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded-full border",
-            "opacity-0 shadow-sm transition-[opacity,transform] duration-(--dur-fast)",
-            "group-hover/block:opacity-100 group-focus-within/block:opacity-100",
-            "hover:scale-110",
-            session.taught
-              ? "border-taught-border bg-surface text-fg-subtle"
-              : "border-primary bg-primary text-primary-fg",
+            "flex size-4 items-center justify-center rounded-full border shadow-sm",
+            "border-overdue-border bg-surface text-overdue-fg",
+            "transition-transform duration-(--dur-fast) hover:scale-110 hover:bg-overdue-bg",
           )}
         >
           <svg viewBox="0 0 16 16" className="size-2.5" fill="none" aria-hidden="true">
-            {session.taught ? (
-              <path
-                d="M4.5 4.5l7 7m0-7-7 7"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-              />
-            ) : (
-              <path
-                d="m3.5 8.5 3 3 6-7"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            )}
+            <path
+              d="M3 4.5h10M6.5 4.5V3.5h3v1M4.5 4.5l.5 8h6l.5-8"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
-      )}
+      </div>
     </div>
   );
 }

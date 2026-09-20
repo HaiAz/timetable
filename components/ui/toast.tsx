@@ -27,7 +27,18 @@ interface Toast {
   tone: ToastTone;
   /** When set, an "Hoàn tác" button appears and runs this on click. */
   onUndo?: () => void;
+  /**
+   * Khi có, toast thành hộp xác nhận: hiện nút "Đồng ý" và không tự tắt, nên
+   * thao tác chỉ thực sự được lưu khi người dùng bấm đồng ý.
+   */
+  onConfirm?: () => void;
+  /** Nhãn nút xác nhận, mặc định "Đồng ý". */
+  confirmLabel?: string;
+  /** Nhãn nút hoàn tác, mặc định "Hoàn tác". */
+  undoLabel?: string;
   duration: number;
+  /** Toast xác nhận không tự tắt — người dùng phải chọn một trong hai. */
+  sticky: boolean;
 }
 
 interface ToastContextValue {
@@ -35,6 +46,9 @@ interface ToastContextValue {
     message: string;
     tone?: ToastTone;
     onUndo?: () => void;
+    onConfirm?: () => void;
+    confirmLabel?: string;
+    undoLabel?: string;
     duration?: number;
   }) => void;
 }
@@ -50,7 +64,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toast = useCallback<ToastContextValue["toast"]>(
-    ({ message, tone = "info", onUndo, duration }) => {
+    ({ message, tone = "info", onUndo, onConfirm, confirmLabel, undoLabel, duration }) => {
       const id = nextId.current++;
       setToasts((current) => [
         // Cap the stack so a burst of actions cannot cover the page.
@@ -60,8 +74,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           message,
           tone,
           onUndo,
+          onConfirm,
+          confirmLabel,
+          undoLabel,
           // Undoable toasts linger longer — there is a decision to make.
           duration: duration ?? (onUndo ? 8000 : 4000),
+          sticky: Boolean(onConfirm),
         },
       ]);
     },
@@ -76,8 +94,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div
         className={cn(
           "pointer-events-none fixed inset-x-0 z-[60] flex flex-col items-center gap-2 px-4",
-          // Above the mobile tab bar; bottom-right on desktop.
-          "bottom-20 sm:bottom-4 sm:items-end sm:px-4",
+          // Giữa màn hình theo chiều ngang, nằm dưới — chỗ mắt dễ bắt được
+          // nhất khi vừa bấm xong. Trên mobile phải né thanh tab dưới cùng.
+          "bottom-20 sm:bottom-8",
         )}
         role="region"
         aria-label="Thông báo"
@@ -100,10 +119,11 @@ function ToastItem({
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    if (paused) return;
+    // Toast xác nhận chờ người dùng quyết định, không tự tắt.
+    if (paused || toast.sticky) return;
     const timer = setTimeout(() => onDismiss(toast.id), toast.duration);
     return () => clearTimeout(timer);
-  }, [paused, toast.id, toast.duration, onDismiss]);
+  }, [paused, toast.sticky, toast.id, toast.duration, onDismiss]);
 
   return (
     <div
@@ -113,7 +133,7 @@ function ToastItem({
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
       className={cn(
-        "pointer-events-auto flex w-full max-w-sm items-center gap-2.5 rounded-lg border px-3.5 py-2.5 shadow-md",
+        "pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border px-4 py-3.5 shadow-lg",
         "motion-safe:animate-[toastIn_var(--dur-base)_var(--ease)]",
         toast.tone === "success" &&
           "border-paid-border bg-paid-bg text-paid-fg",
@@ -125,7 +145,7 @@ function ToastItem({
       {toast.tone === "success" && <CheckIcon />}
       {toast.tone === "error" && <WarnIcon />}
 
-      <p className="min-w-0 flex-1 text-sm" role="status" aria-live="polite">
+      <p className="min-w-0 flex-1 text-base" role="status" aria-live="polite">
         {toast.message}
       </p>
 
@@ -136,15 +156,33 @@ function ToastItem({
             toast.onUndo?.();
             onDismiss(toast.id);
           }}
-          className="shrink-0 rounded-sm px-2 py-1 text-sm font-semibold underline decoration-current/40 underline-offset-2 hover:decoration-current"
+          className="shrink-0 rounded-md px-2.5 py-1.5 text-base font-semibold underline decoration-current/40 underline-offset-2 hover:decoration-current"
         >
-          Hoàn tác
+          {toast.undoLabel ?? "Hoàn tác"}
+        </button>
+      )}
+
+      {toast.onConfirm && (
+        <button
+          type="button"
+          onClick={() => {
+            toast.onConfirm?.();
+            onDismiss(toast.id);
+          }}
+          className="shrink-0 rounded-md bg-primary px-3.5 py-1.5 text-base font-semibold text-primary-fg shadow-sm hover:bg-primary-hover"
+        >
+          {toast.confirmLabel ?? "Đồng ý"}
         </button>
       )}
 
       <button
         type="button"
-        onClick={() => onDismiss(toast.id)}
+        onClick={() => {
+          // Đóng một toast xác nhận = từ chối, nếu không thay đổi đang chờ sẽ
+          // bị bỏ lửng mà không ai hoàn tác.
+          if (toast.onConfirm) toast.onUndo?.();
+          onDismiss(toast.id);
+        }}
         aria-label="Đóng thông báo"
         className="shrink-0 rounded-sm p-1 opacity-60 hover:opacity-100"
       >

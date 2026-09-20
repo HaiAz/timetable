@@ -95,14 +95,41 @@ export function ApplyLastWeekDialog({
             : "Không có buổi học nào được sao chép.",
         tone: "info",
       });
-    } else {
-      toast({
-        message: `Đã thêm ${result.created} buổi học${
-          result.skipped > 0 ? `, bỏ qua ${result.skipped} buổi trùng` : ""
-        }.`,
-        tone: "success",
-      });
+      return;
     }
+
+    // Lịch đã được chép sang để xem trước ngay trên lưới; chỉ khi bấm "Đồng ý"
+    // mới coi là giữ lại, còn "Hoàn tác" sẽ trả tuần về đúng như trước.
+    const restored =
+      result.removedSessions.length > 0
+        ? `, khôi phục ${result.removedSessions.length} buổi cũ`
+        : "";
+
+    toast({
+      message: `Đã chép ${result.created} buổi học${
+        result.skipped > 0 ? `, bỏ qua ${result.skipped} buổi trùng` : ""
+      }. Kiểm tra lịch rồi xác nhận.`,
+      tone: "info",
+      confirmLabel: "Đồng ý",
+      undoLabel: "Hoàn tác",
+      onConfirm: () => {
+        toast({ message: "Đã lưu lịch tuần này.", tone: "success" });
+      },
+      onUndo: () => {
+        void (async () => {
+          const ok = await run(() =>
+            store.revertApplyWeek(result.createdIds, result.removedSessions),
+          );
+          // `run` trả undefined khi gặp lỗi và đã hiện thông báo lỗi riêng.
+          if (ok !== undefined) {
+            toast({
+              message: `Đã hoàn tác, bỏ ${result.created} buổi vừa chép${restored}.`,
+              tone: "success",
+            });
+          }
+        })();
+      },
+    });
   }
 
   const picker = (

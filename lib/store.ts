@@ -778,6 +778,19 @@ export const store = {
   },
 
   /**
+   * Ghi lại nguyên vẹn một buổi học đã xoá, giữ đúng id và cả `rateSnapshot`,
+   * `taughtAt`. Dùng cho "hoàn tác xoá" — `addSession` không thay thế được vì
+   * nó sinh id mới và tính lại đơn giá theo thời điểm hiện tại.
+   */
+  async restoreSession(session: Session): Promise<void> {
+    try {
+      await setDoc(doc(sessionsRef(), session.id), stripUndefined({ ...session }));
+    } catch (error) {
+      throw toStoreError(error, "Không khôi phục được buổi học.");
+    }
+  },
+
+  /**
    * Copy every session from the week before `weekStart` into that week.
    * Copies are always untaught. Exact duplicates (same student, weekday and
    * times) are skipped, and archived students are left out.
@@ -790,7 +803,14 @@ export const store = {
     weekStart: string,
     previousWeekStart: string,
     mode: "append" | "replace",
-  ): Promise<{ created: number; skipped: number }> {
+  ): Promise<{
+    created: number;
+    skipped: number;
+    /** Id các buổi vừa tạo — để hoàn tác thì xoá đúng chúng. */
+    createdIds: string[];
+    /** Các buổi bị xoá ở chế độ replace — để hoàn tác thì khôi phục nguyên trạng. */
+    removedSessions: Session[];
+  }> {
     try {
       const data = await loadAll();
 
@@ -864,9 +884,70 @@ export const store = {
         await batch.commit();
       }
 
-      return { created: created.length, skipped };
+      return {
+        created: created.length,
+        skipped,
+        createdIds: created.map((s) => s.id),
+        removedSessions: removed,
+      };
     } catch (error) {
       throw toStoreError(error, "Không áp dụng được lịch tuần trước.");
+    }
+  },
+
+  /**
+   * Xoá sạch buổi học của một tuần, kể cả buổi đã đánh dấu đã dạy.
+   *
+   * @returns các buổi đã xoá, để hoàn tác khôi phục lại nguyên vẹn.
+   */
+  async clearWeek(weekStart: string): Promise<Session[]> {
+    try {
+      const data = await loadAll();
+      const dates = new Set(weekDatesFrom(weekStart));
+      const removed = data.sessions.filter((s) => dates.has(s.date));
+
+      for (let i = 0; i < removed.length; i += BATCH_LIMIT) {
+        const batch = writeBatch(db());
+        for (const session of removed.slice(i, i + BATCH_LIMIT)) {
+          batch.delete(doc(sessionsRef(), session.id));
+        }
+        await batch.commit();
+      }
+
+      return removed;
+    } catch (error) {
+      throw toStoreError(error, "Không xoá được lịch của tuần này.");
+    }
+  },
+
+  /**
+   * Trả tuần về đúng trạng thái trước khi áp dụng lịch: xoá các buổi vừa được
+   * chép sang và khôi phục các buổi đã bị `replace` xoá đi.
+   */
+  async revertApplyWeek(
+    createdIds: string[],
+    removedSessions: Session[],
+  ): Promise<void> {
+    try {
+      type Op = { kind: "delete"; id: string } | { kind: "set"; session: Session };
+      const ops: Op[] = [
+        ...createdIds.map((id): Op => ({ kind: "delete", id })),
+        ...removedSessions.map((session): Op => ({ kind: "set", session })),
+      ];
+
+      for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
+        const batch = writeBatch(db());
+        for (const op of ops.slice(i, i + BATCH_LIMIT)) {
+          if (op.kind === "delete") {
+            batch.delete(doc(sessionsRef(), op.id));
+          } else {
+            batch.set(doc(sessionsRef(), op.session.id), stripUndefined({ ...op.session }));
+          }
+        }
+        await batch.commit();
+      }
+    } catch (error) {
+      throw toStoreError(error, "Không hoàn tác được lịch vừa áp dụng.");
     }
   },
 

@@ -10,7 +10,10 @@ import {
   type SessionDialogMode,
 } from "@/components/timetable/session-dialog";
 import { ApplyLastWeekDialog } from "@/components/timetable/apply-last-week-dialog";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
+import { store } from "@/lib/store";
 import { PageHeader } from "@/components/ui/card";
 import { TimetableSkeleton } from "@/components/ui/skeleton";
 import { LoadingRegion, Skeleton } from "@/components/ui/skeleton";
@@ -41,7 +44,8 @@ import { resolveSelectedDay } from "@/lib/selected-day";
  * grid is not usable at phone width.
  */
 export default function TimetablePage() {
-  const { data, isLoading } = useData();
+  const { data, isLoading, run } = useData();
+  const { toast } = useToast();
   const studentMap = useStudentMap();
 
   // `null` during SSR and the first client render — the viewer's local date is
@@ -54,6 +58,7 @@ export default function TimetablePage() {
 
   const [dialog, setDialog] = useState<SessionDialogMode | null>(null);
   const [applyOpen, setApplyOpen] = useState(false);
+  const [clearOpen, setClearOpen] = useState(false);
 
   const weekStart = weekOverride ?? (today ? startOfWeek(today) : null);
 
@@ -107,6 +112,24 @@ export default function TimetablePage() {
 
   function openSession(session: Session) {
     setDialog({ kind: "edit", session });
+  }
+
+  async function clearWeek() {
+    if (!weekStart) return;
+    const removed = await run(() => store.clearWeek(weekStart));
+    if (!removed || removed.length === 0) return;
+
+    const taught = removed.filter((s) => s.taught).length;
+    toast({
+      message: `Đã xoá ${removed.length} buổi của tuần này${
+        taught > 0 ? `, trong đó ${taught} buổi đã dạy` : ""
+      }.`,
+      tone: "success",
+      onUndo: () =>
+        void run(async () => {
+          for (const session of removed) await store.restoreSession(session);
+        }),
+    });
   }
 
   /* Loading ----------------------------------------------------------- */
@@ -173,6 +196,18 @@ export default function TimetablePage() {
               <span className="hidden sm:inline">Áp dụng lịch tuần khác</span>
               <span className="sm:hidden">Lịch tuần khác</span>
             </Button>
+
+            {weekTotals.count > 0 && (
+              <Button
+                intent="danger"
+                onClick={() => setClearOpen(true)}
+                title="Xoá toàn bộ buổi học của tuần đang xem"
+              >
+                <TrashIcon />
+                <span className="hidden sm:inline">Xoá lịch tuần này</span>
+                <span className="sm:hidden">Xoá tuần</span>
+              </Button>
+            )}
 
             <Button
               intent="primary"
@@ -301,6 +336,24 @@ export default function TimetablePage() {
         weekStart={weekStart}
         onClose={() => setApplyOpen(false)}
       />
+
+      <ConfirmDialog
+        open={clearOpen}
+        onClose={() => setClearOpen(false)}
+        onConfirm={() => void clearWeek()}
+        title="Xoá lịch tuần này?"
+        description={`Xoá toàn bộ ${weekTotals.count} buổi của tuần ${formatWeekRange(weekStart)}${
+          weekTotals.taught > 0
+            ? `, kể cả ${weekTotals.taught} buổi đã đánh dấu đã dạy`
+            : ""
+        }.`}
+        confirmLabel="Xoá lịch tuần"
+        tone="danger"
+      >
+        <p className="text-base text-fg-muted">
+          Bấm “Hoàn tác” trong thông báo hiện ra sau đó để khôi phục lại nếu xoá nhầm.
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }
@@ -350,6 +403,20 @@ function CopyIcon() {
     <svg viewBox="0 0 16 16" className="size-4" fill="none" aria-hidden="true">
       <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
       <path d="M10.5 5.5v-1a1.5 1.5 0 0 0-1.5-1.5H4a1.5 1.5 0 0 0-1.5 1.5v5A1.5 1.5 0 0 0 4 11h1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="size-4" fill="none" aria-hidden="true">
+      <path
+        d="M3 4.5h10M6.5 4.5V3.5h3v1M4.5 4.5l.5 8h6l.5-8"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
